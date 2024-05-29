@@ -7,9 +7,11 @@
 //<index> <state> <time>
 // 1 1 10
 
+// Cleaning
 // DIRECTION OF PUMP
 const int FORWARD = 1;
 const int REVERSE = 2;
+const int CLEAN = 3;
 const int HALT = 0;
 
 // PIN OF PUMP
@@ -44,19 +46,19 @@ void setup() {
     } 
 }
 
-
 void loop() {
     currentTime = millis();
     deltaTime = currentTime - lastTime;
 
-    // check Duration of Pump and Relays
+    // Check Duration of Pump and Relays
     reduceDurations(deltaTime);
 
-    // check input Pump and Relays
+    // Check input Pump and Relays
     handleInput();
 
     lastTime = currentTime;
 }
+
 void setupTimekeeping() {
     currentTime = millis();
     lastTime = currentTime;
@@ -114,7 +116,7 @@ void turn(int pump, int dir, int speed) {
     }
 }
 
-//Case for pump direction and stop
+// Case for pump direction and stop
 void turnDirection(int pump, int dir) {
     int out1;
     int out2;
@@ -158,57 +160,82 @@ void handleInput() {
             array[count++] = token; // Store token in the array and increment count
             token = strtok(NULL, delimiter);
         }
-       if (count == 4){
-          //Asign which part of the input command to be read
-          String pump = array[0];
-          String dirString = array[1];
-          String durationString = array[2];
-          String speedString = array[3];
+        if (count == 4) {
+            // Assign which part of the input command to be read
+            String pump = array[0];
+            String dirString = array[1];
+            String durationString = array[2];
+            String speedString = array[3];
 
-          // Convert String to char array
-          int pumpIndex = pump.charAt(0) -'1';
-          // char dirChar = dir.charAt(0);
+            // Convert String to char array
+            int pumpIndex = pump.charAt(0) - '1';
+            // char dirChar = dir.charAt(0);
 
-          // Convert duration and speed from String to int
-          int dir = extractDuration(dirString.c_str()); 
-          int duration = extractDuration(durationString.c_str());
-          int speed = extractSpeed(speedString.c_str());
+            // Convert duration and speed from String to int
+            int dir = extractDuration(dirString.c_str());
+            int duration = extractDuration(durationString.c_str());
+            int speed = extractSpeed(speedString.c_str());
 
-          // Start or update duration only if it's greater than 0
-          if (speed >= 0 && speed <= 255) {
-              turn(pumpIndex, dir, speed);                
-              if (duration > 0) {
-                durations_Pump[pumpIndex] = duration;
-              } else {
-                  Serial.println("Error: Speed out of range (0 - 255)");
-              }
-          }
-          //Print input double check
-          //LCD Crystal add later
-          Serial.println(pump);
-          Serial.println(dir);
-          Serial.println(duration);
-          Serial.println(speed);
-      }
-      else if (count == 3) {
+            // Start or update duration only if it's greater than 0
+            if (speed >= 0 && speed <= 255) {
+                turn(pumpIndex, dir, speed);
+                if (duration > 0) {
+                    durations_Pump[pumpIndex] = duration;
+                } else {
+                    Serial.println("Error: Speed out of range (0 - 255)");
+                }
+            }
+            // Print input double check
+            // LCD Crystal add later
+            Serial.println(pump);
+            Serial.println(dir);
+            Serial.println(duration);
+            Serial.println(speed);
+        } else if (count == 3) {
             int relayIndex = atoi(array[0]) - 1;
             char relayState = array[1][0];
             String durationString = array[2];
-            // convert char to string to extract duration
+            // Convert char to string to extract duration
             int duration = extractDuration(durationString.c_str());
-
 
             if (relayIndex >= 0 && relayIndex < numRelays) {
                 if (relayState == '1') {
                     digitalWrite(relayPins[relayIndex], HIGH);
                     if (duration > 0) {
-                      durations_Relays[relayIndex] = duration;
-                    } 
+                        durations_Relays[relayIndex] = duration;
+                    }
                 } else if (relayState == '0') {
                     digitalWrite(relayPins[relayIndex], LOW);
                 }
+            }
+        } else if (count == 1) {
+            String command = array[0];
+            if (command == "CLEAN") {
+                cleanPumps();
             }
         }
     }
 }
 
+// Function to clean all water pumps by running them for 30 seconds
+void cleanPumps() {
+    const int cleanDuration = 30000; // 30 seconds in milliseconds
+    const int cleanSpeed = 255; // Full speed
+
+    Serial.println("Starting water pump cleaning process...");
+
+    // Set all pumps to run forward at full speed
+    for (int i = 0; i < PUMP_COUNT; i++) {
+        turn(i, FORWARD, cleanSpeed);
+    }
+
+    // Wait for 30 seconds
+    delay(cleanDuration);
+
+    // Stop all pumps
+    for (int i = 0; i < PUMP_COUNT; i++) {
+        turn(i, HALT, 0);
+    }
+
+    Serial.println("Water pump cleaning process completed.");
+}
